@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WTalk - Global Chat</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    h1 { color: #00d9ff; }
+    #chatBox {
+      width: 90%;
+      max-width: 600px;
+      height: 400px;
+      background-color: rgba(255, 255, 255, 0.05);
+      border: 1px solid #444;
+      overflow-y: auto;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 10px;
+    }
+    input, select, button {
+      padding: 10px;
+      margin: 5px;
+      border-radius: 8px;
+      border: none;
+    }
+    #footer {
+      font-size: 0.8em;
+      margin-top: 20px;
+      color: #aaa;
+    }
+    .profile-pic {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      object-fit: cover;
+      margin-right: 5px;
+    }
+    .chat-message {
+      display: flex;
+      align-items: center;
+      margin: 5px 0;
+      padding: 6px 10px;
+      background-color: rgba(255, 255, 255, 0.1);
+      border-radius: 6px;
+    }
+    .chat-meta {
+      font-size: 0.9em;
+      color: #ccc;
+      margin-left: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>WTalk 🌍</h1>
+
+  <input type="text" id="username" placeholder="Enter your name" />
+  <input type="file" id="profilePic" accept="image/*" />
+  <br>
+
+  <div>
+    <select id="gender">
+      <option value="male">♂️ Male</option>
+      <option value="female">♀️ Female</option>
+    </select>
+    <select id="country"></select>
+    <select id="dmSelect">
+      <option value="">🌐 Public</option>
+    </select>
+  </div>
+
+  <div id="chatBox"></div>
+  <input type="text" id="messageInput" placeholder="Type your message..." />
+  <button onclick="sendMessage()">Send</button>
+
+  <div id="footer">WTalk - Be respectful | No NSFW | No racism | No personal info</div>
+
+  <script>
+    const bannedWords = ["nsfw", "porn", "sex", "fuck", "nude", "racist", "kill", "rape", "hate"];
+    const sensitiveInfoPatterns = [
+      /\b\d{10,}\b/g,
+      /\b(?:\d[ -]*?){13,16}\b/g,
+      /[a-zA-Z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi
+    ];
+
+    const countries = [
+      { name: "Afghanistan", flag: "🇦🇫" }, { name: "Albania", flag: "🇦🇱" },
+      { name: "Algeria", flag: "🇩🇿" }, { name: "Andorra", flag: "🇦🇩" },
+      { name: "Angola", flag: "🇦🇴" }, { name: "Argentina", flag: "🇦🇷" },
+      { name: "Armenia", flag: "🇦🇲" }, { name: "Australia", flag: "🇦🇺" },
+      { name: "Austria", flag: "🇦🇹" }, { name: "Azerbaijan", flag: "🇦🇿" },
+      { name: "Bahamas", flag: "🇧🇸" }, { name: "Bahrain", flag: "🇧🇭" },
+      { name: "Bangladesh", flag: "🇧🇩" }, { name: "Barbados", flag: "🇧🇧" },
+      { name: "Belarus", flag: "🇧🇾" }, { name: "Belgium", flag: "🇧🇪" },
+      { name: "Belize", flag: "🇧🇿" }, { name: "Benin", flag: "🇧🇯" },
+      { name: "Bhutan", flag: "🇧🇹" }, { name: "Bolivia", flag: "🇧🇴" },
+      { name: "Bosnia and Herzegovina", flag: "🇧🇦" }, { name: "Botswana", flag: "🇧🇼" },
+      { name: "Brazil", flag: "🇧🇷" }, { name: "Brunei", flag: "🇧🇳" },
+      { name: "Bulgaria", flag: "🇧🇬" }, { name: "Burkina Faso", flag: "🇧🇫" },
+      { name: "Burundi", flag: "🇧🇮" }, { name: "Cambodia", flag: "🇰🇭" },
+      { name: "Cameroon", flag: "🇨🇲" }, { name: "Canada", flag: "🇨🇦" },
+      { name: "Cape Verde", flag: "🇨🇻" }, { name: "Central African Republic", flag: "🇨🇫" },
+      { name: "Chad", flag: "🇹🇩" }, { name: "Chile", flag: "🇨🇱" },
+      { name: "China", flag: "🇨🇳" }, { name: "Colombia", flag: "🇨🇴" },
+      { name: "Comoros", flag: "🇰🇲" }, { name: "Congo", flag: "🇨🇬" },
+      { name: "Costa Rica", flag: "🇨🇷" }, { name: "Croatia", flag: "🇭🇷" },
+      { name: "Cuba", flag: "🇨🇺" }, { name: "Cyprus", flag: "🇨🇾" },
+      { name: "Czech Republic", flag: "🇨🇿" }, { name: "Denmark", flag: "🇩🇰" },
+      { name: "Djibouti", flag: "🇩🇯" }, { name: "Dominica", flag: "🇩🇲" },
+      { name: "Dominican Republic", flag: "🇩🇴" },
+      { name: "Zambia", flag: "🇿🇲" }, { name: "Zimbabwe", flag: "🇿🇼" }
+    ];
+
+    const countrySelect = document.getElementById('country');
+    countries.forEach(c => {
+      const opt = document.createElement('option');
+      opt.value = `${c.flag} ${c.name}`;
+      opt.textContent = `${c.flag} ${c.name}`;
+      countrySelect.appendChild(opt);
+    });
+
+    let userProfilePic = "";
+
+    document.getElementById('profilePic').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          userProfilePic = evt.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    function isBanned(text) {
+      const lower = text.toLowerCase();
+      if (bannedWords.some(w => lower.includes(w))) return true;
+      if (sensitiveInfoPatterns.some(p => p.test(text))) return true;
+      return false;
+    }
+
+    function sendMessage() {
+      const msg = document.getElementById('messageInput').value.trim();
+      const name = document.getElementById('username').value.trim();
+      const gender = document.getElementById('gender').value;
+      const country = document.getElementById('country').value;
+      const dmTo = document.getElementById('dmSelect').value;
+
+      if (!msg || !name) {
+        alert("Please enter both a name and a message.");
+        return;
+      }
+
+      if (isBanned(msg)) {
+        alert("Message contains inappropriate content or personal info.");
+        return;
+      }
+
+      const chatBox = document.getElementById('chatBox');
+      const entry = document.createElement("div");
+      entry.className = "chat-message";
+
+      const profileImg = document.createElement("img");
+      profileImg.className = "profile-pic";
+      profileImg.src = userProfilePic || "https://via.placeholder.com/30";
+
+      const text = document.createElement("span");
+      text.textContent = `${country} | ${name} (${gender})${dmTo ? " [DM to " + dmTo + "]" : ""}: ${msg}`;
+
+      entry.appendChild(profileImg);
+      entry.appendChild(text);
+      chatBox.appendChild(entry);
+      chatBox.scrollTop = chatBox.scrollHeight;
+
+      const dmSelect = document.getElementById('dmSelect');
+      if (![...dmSelect.options].some(opt => opt.value === name)) {
+        const newOpt = document.createElement("option");
+        newOpt.value = name;
+        newOpt.textContent = `💬 ${name}`;
+        dmSelect.appendChild(newOpt);
+      }
+
+      document.getElementById('messageInput').value = "";
+    }
+
+    document.getElementById('messageInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') sendMessage();
+    });
+  </script>
+</body>
+</html>
